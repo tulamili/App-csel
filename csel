@@ -1,7 +1,6 @@
 #!/usr/bin/perl -T
 use 5.008 ; use strict ; use warnings ; # 5.011
-use Getopt::Std ; getopts '~i:=!d:0:h:np:rt:' , \my %o ; 
-#use List::MoreUtils qw/any none/ ; 
+use Getopt::Std ; getopts '~=!R:d:0:h:i:np:rt:' , \my %o ; 
 use List::Util qw [ max ] ;
 use Encode qw/decode_utf8/ ; 
 use Memoize ; 
@@ -23,6 +22,8 @@ my $isep = $o{i} // "\t" ; # 入力の区切り文字
 my $split_limit = $isep eq '' ? 0 : -1 ; # split で使う。split//はLIMIT=0にしないと、結果に空文字列の値が最後に生じる
 my $osep = $isep eq '' && $o{n} ? ' ' : $isep ; # 出力の区切り子
 
+my $optR0 = defined $o{R} && $o{R} eq 0 ;
+* R0proc = $optR0 ? sub {} : sub { s/\r$// } ; 
 
 & init ; # オプションについての処理 
 & main ;  # メインの処理  printColsMain
@@ -89,6 +90,7 @@ sub sCols ( $ ) {
 # 各行の出力処理。 sCols関数を呼び出して、選択する。-n で列番号も付ける。
 sub line ( ) { 
   chomp ; 
+  & R0proc ; 
   $_ = decode_utf8 ( $_ ) if $isep eq '' ; # 入力がSTDINとは限らないので binmode を使わず decode_utf8
   my @F = split /$isep/ , $_ , $split_limit   ; #use Data::Dumper ; print scalar @F , Dumper [@F];  
   @F = map { $_ + 1 . ":$F[$_]" } 0 .. $#F  if $o{n} ;   # -n で列番号をコロンを付けて出力
@@ -104,6 +106,7 @@ sub main {
   if ( $o{'='} ) { 
       $_ = <> ; 
       chomp ;  
+      & R0proc ; 
       my $c = 0 ;
       $colNamePos { $_ } = ++ $c  for split /$isep/ , $_ , $split_limit ; # <-- 分割文字列に気をつけたい
       $cream{ $_ } = [ expand $o{$_} ] for qw/p d h t/ ;    
@@ -171,6 +174,8 @@ sub HELP_MESSAGE {
          
    -n  : 列に番号を付与する。
    -~  : 列の順番を逆転して、元に戻したい時に使う。 $0 -t3 | $0 -~ -t3 のように使う。5列に対して $0 -~ -p3,4,2,1,5 のような使い方をする。
+
+   -R 0 ; Windows形式の改行に合わせて通常s/\r$//を施しているが、それが不都合な場合もあるので(さらに高速化したいとか文字化けとか) -R0で解除。
 
   --help : この $0 のヘルプメッセージを出す。  perldoc -t $0 | cat でもほぼ同じ。
   --help opt : オプションのみのヘルプを出す。opt以外でも options と先頭が1文字以上一致すれば良い。
